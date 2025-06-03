@@ -1,63 +1,40 @@
 package app;
 
 import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.GridLayout;
 import java.awt.Image;
+import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.HashSet;
 import java.util.Random;
 import javax.swing.ImageIcon;
+import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
+import javax.swing.OverlayLayout;
 import javax.swing.Timer;
+import java.sql.*;
+import javax.swing.BorderFactory;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JTextField;
+import javax.swing.SwingConstants;
+import javax.sound.sampled.*;
+import java.io.*;
 
-class Frame extends JFrame {
-    ImageIcon logo = new ImageIcon(App.class.getResource("logo_1.png"));
-    Map map;
-   
-    Frame() {
-        //objects
-        map = new Map();
-       
-        //frame setting
-        this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        this.setResizable(false);
-        this.setTitle("Pac-Man");
-        this.setIconImage(logo.getImage());
-        //panels
-        this.add(map);
-        
-        //panel setting
-        this.pack();
-        this.setLocationRelativeTo(null);
-        this.setVisible(true);
-    }
-}
-
-class Position {
-    Image image;
-    int x;
-    int y;
-    int width;
-    int height;
-    int startX;
-    int startY;
-    
-    Position(Image image, int x, int y, int width, int height) {
-        this.image = image;
-        this.x = x;
-        this.y = y;
-        this.width = width;
-        this.height = height;
-        this.startX = x;
-        this.startY = y;
-    }
-}
 
 class Map extends JPanel implements KeyListener, ActionListener {
     //tile variables
@@ -73,23 +50,28 @@ class Map extends JPanel implements KeyListener, ActionListener {
     protected int score = 0;
     
     // Movement variables
-    private char currentDirection = 'd'; // Current moving direction
-    private char nextDirection = 'd';    // Next attempted direction
+    private char currentDirection = 'w'; // Current moving direction
+    private char nextDirection = 'w';    // Next attempted direction
     //blue ghost movement
     private char blueGhostDir = 'a';
 private int blueGhostStepCount = 0;
 //red ghost movement
- private char redGhostDir = 'a';
+ private char redGhostDir = 'w';
 private int redGhostStepCount = 0;
 //Pink ghost movement
- private char pinkGhostDir = 'a';
+ private char pinkGhostDir = 's';
 private int pinkGhostStepCount = 0;
 //orange ghost movement
- private char orangeGhostDir = 'a';
+ private char orangeGhostDir = 'd';
 private int orangeGhostStepCount = 0;
-
-
-  
+//pause screen vaiables
+public boolean isPaused = false;
+private Pause pauseMenu;
+  //login system variable
+private LoginSystem loginSystem;
+//sound variable
+private Sound sound;
+ private boolean foodCollected = false;//takay food collect wali sound play ho
     
     HashSet<Position> walls;
     HashSet<Position> foods;
@@ -109,8 +91,12 @@ private int orangeGhostStepCount = 0;
     private Image pacmanLeftImage;
     private Image pacmanRightImage;
 
-    Map() {
-        
+    Map(LoginSystem loginSystem) {
+        //initilizing
+        this.loginSystem = loginSystem;
+        this.sound = new Sound();
+         sound.playGameStart();
+        //setting window
         setPreferredSize(new Dimension(width, height));
         setBackground(Color.BLACK);
         setDoubleBuffered(true);
@@ -129,11 +115,16 @@ private int orangeGhostStepCount = 0;
         pacmanDownImage = new ImageIcon(getClass().getResource("./pacmanDown.png")).getImage();
         pacmanLeftImage = new ImageIcon(getClass().getResource("./pacmanLeft.png")).getImage();
         pacmanRightImage = new ImageIcon(getClass().getResource("./pacmanRight.png")).getImage();
-        
+        //pause menu
+       pauseMenu = new Pause(this);
+    this.setLayout(new OverlayLayout(this));
+    this.add(pauseMenu);
+    pauseMenu.setFocusable(true);
+//loading map
         loadMap();
         
         // Game loop 
-        Timer gameLoop = new Timer(5, this);
+        Timer gameLoop = new Timer(10, this);
         gameLoop.start();
     }
 
@@ -235,6 +226,7 @@ private int orangeGhostStepCount = 0;
         g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 15));
         if (gameOver) {
             g.drawString("Game Over: " + String.valueOf(score), blockSize/2, blockSize/2);
+            loginSystem.saveScore(score);
         }
         else {
             g.drawString("x" + String.valueOf(life) + " Score: " + String.valueOf(score), blockSize/2, blockSize/2);
@@ -299,6 +291,7 @@ private int orangeGhostStepCount = 0;
             food.y + food.height/2 >= nextY && 
             food.y <= nextY + Pacman.height) {
             foodToRemove = food;
+            sound.playChomp(); 
             score += 10;
             break; 
         }
@@ -340,6 +333,7 @@ private int orangeGhostStepCount = 0;
         case 'w': nextY -= blockSize / 12; break;
         case 's': nextY += blockSize / 12; break;
     }
+
 
     Position nextBlue = new Position(null, nextX, nextY, blueGhost.width, blueGhost.height);
 
@@ -514,7 +508,53 @@ public void ghostMovementOrange() {
            orangeGhost.x = 0;
        }
 }
+//to access pauseMenu and change the isPaused condition will run when space is clicked
+public void togglePause() {
+    isPaused = !isPaused;
+    pauseMenu.setVisible(isPaused);
+    if (isPaused) {
+        pauseMenu.requestFocusInWindow();
+        System.out.println("Game Paused"); // Debug line
+    } else {
+        requestFocusInWindow();
+        System.out.println("Game Resumed"); // Debug line
+    }
+    repaint();
+}
+//jab restart button pause menu mein press ho mouse listener mein ye method run keray ga
+    public void resetGame() {
+    gameOver = false;
+    life = 3;
+    score = 0;
+    currentDirection = 'd';
+    nextDirection = 'd';
     
+    
+    walls.clear();
+    foods.clear();
+    loadMap();
+    
+    repaint();
+}
+    private void resetPositions() {
+    // Immediately reset positions without animation
+    Pacman.x = Pacman.startX;
+    Pacman.y = Pacman.startY;
+    
+    blueGhost.x = blueGhost.startX;
+    blueGhost.y = blueGhost.startY;
+    
+    redGhost.x = redGhost.startX;
+    redGhost.y = redGhost.startY;
+    
+    pinkGhost.x = pinkGhost.startX;
+    pinkGhost.y = pinkGhost.startY;
+    
+    orangeGhost.x = orangeGhost.startX;
+    orangeGhost.y = orangeGhost.startY;
+    
+    repaint(); // Force immediate redraw
+}
     @Override
     public void keyTyped(KeyEvent e) {}
 
@@ -524,6 +564,9 @@ public void ghostMovementOrange() {
         if (key == 'w' || key == 'a' || key == 's' || key == 'd') {
             nextDirection = key; 
         }
+         else if (e.getKeyCode() == KeyEvent.VK_SPACE) {
+        togglePause();//map class wala not pause class
+    }
     }
 
     @Override
@@ -531,7 +574,9 @@ public void ghostMovementOrange() {
 //jab bhi koi action listener milay move will be applied
     @Override
     public void actionPerformed(ActionEvent e) {
-       
+         if (isPaused || gameOver) {
+        return; // Skip all game logic when paused or game over
+    }
             move();
             ghostMovementBlue();
 ghostMovementRed();
@@ -544,8 +589,8 @@ if (collision(Pacman, blueGhost) || collision(Pacman, redGhost) ||
         collision(Pacman, pinkGhost) || collision(Pacman, orangeGhost)) {
         
         life--;
-
-        // Reset all to starting positions
+         sound.playDeath();
+       
         Pacman.x = Pacman.startX;
         Pacman.y = Pacman.startY;
 
@@ -563,33 +608,21 @@ if (collision(Pacman, blueGhost) || collision(Pacman, redGhost) ||
 
         if (life == 0) {
             gameOver = true;
+            
+            sound.playGameOver();
+             resetPositions(); // Ensure positions are reset immediately
+    repaint(); 
         }
     }
 
     repaint();
         
+    }//action performed ends here
     }
-}
-//pause menu
-//class Pause extends JPanel implements KeyListener{
-//private int width = 608;
-//private int height = 672;
-//
-//    @Override
-//    public void keyTyped(KeyEvent e) {      }
-//
-//    @Override
-//    public void keyPressed(KeyEvent e) {    }
-//
-//    @Override
-//    public void keyReleased(KeyEvent e) {
-//        if (e.getKeyCode() == KeyEvent.VK_SPACE) {
-//        System.out.println("Spacebar pressed!");
-//        // Add your game logic (e.g., pause, shoot, etc.)
-//    }
-//    }
-//    
-//}
+//Map class ends here
+
+
+
 public class App {
     public static void main(String[] args) {
     new Frame();
