@@ -1,16 +1,14 @@
 package app;
 
+import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Graphics;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Image;
-import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
@@ -21,19 +19,13 @@ import java.util.HashSet;
 import java.util.Random;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
-import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.OverlayLayout;
 import javax.swing.Timer;
-import java.sql.*;
 import javax.swing.BorderFactory;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JTextField;
 import javax.swing.SwingConstants;
-import javax.sound.sampled.*;
-import java.io.*;
 
 
 class Map extends JPanel implements KeyListener, ActionListener {
@@ -293,6 +285,7 @@ private Sound sound;
             foodToRemove = food;
             sound.playChomp(); 
             score += 10;
+            gameWon();
             break; 
         }
     }
@@ -522,22 +515,34 @@ public void togglePause() {
     repaint();
 }
 //jab restart button pause menu mein press ho mouse listener mein ye method run keray ga
-    public void resetGame() {
+public void resetGame() {
     gameOver = false;
-    life = 3;
+    isPaused = false;
+
+    life  = 3;
     score = 0;
-    currentDirection = 'd';
-    nextDirection = 'd';
-    
-    
+
+    // 1️⃣  Let Pac-Man start idle
+    currentDirection = ' ';
+    nextDirection    = ' ';
+
+    // 2️⃣  Rebuild the map FIRST – this gives you fresh Position objects
     walls.clear();
     foods.clear();
-    loadMap();
-    
+    loadMap();          // <-- creates new Pacman / ghost instances
+
+    // 3️⃣  Now snap the *new* instances to their spawn coordinates
+    resetPositions();   
+
+    // If you ever stopped the timer when gameOver==true, restart it here
+    // gameLoop.start();
+
+    requestFocusInWindow();   // regain keyboard input
     repaint();
 }
+
     private void resetPositions() {
-    // Immediately reset positions without animation
+   
     Pacman.x = Pacman.startX;
     Pacman.y = Pacman.startY;
     
@@ -553,7 +558,177 @@ public void togglePause() {
     orangeGhost.x = orangeGhost.startX;
     orangeGhost.y = orangeGhost.startY;
     
-    repaint(); // Force immediate redraw
+    repaint(); 
+}//reset position ends here
+    
+    
+// Add these methods to your Map class
+private void showGameOverDialog() {
+    // Get high score from login system
+    int highScore = loginSystem.getCurrentHighScore();
+    
+    // Create custom dialog
+    JDialog gameOverDialog = new JDialog();
+    gameOverDialog.setTitle("Game Over");
+    gameOverDialog.setSize(400, 300);
+    gameOverDialog.setLayout(new BorderLayout(10, 10));
+    gameOverDialog.setLocationRelativeTo(this);
+    gameOverDialog.setModal(true);
+    
+    // Main panel with game over message
+    JPanel mainPanel = new JPanel(new GridLayout(3, 1, 10, 10));
+    mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+    mainPanel.setBackground(Color.BLACK);
+    
+    // Game over label
+    JLabel gameOverLabel = new JLabel("GAME OVER", SwingConstants.CENTER);
+    gameOverLabel.setFont(new Font("Arial", Font.BOLD, 32));
+    gameOverLabel.setForeground(Color.RED);
+    
+    // Score labels
+    JLabel scoreLabel = new JLabel("Your Score: " + score, SwingConstants.CENTER);
+    JLabel highScoreLabel = new JLabel("High Score: " + highScore, SwingConstants.CENTER);
+    
+    Font scoreFont = new Font("Arial", Font.BOLD, 20);
+    scoreLabel.setFont(scoreFont);
+    scoreLabel.setForeground(Color.WHITE);
+    highScoreLabel.setFont(scoreFont);
+    highScoreLabel.setForeground(Color.YELLOW);
+    
+    // Add components to main panel
+    mainPanel.add(gameOverLabel);
+    mainPanel.add(scoreLabel);
+    mainPanel.add(highScoreLabel);
+    
+    // Button panel
+    JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
+    buttonPanel.setBackground(Color.BLACK);
+    
+    // Restart button
+    JButton restartButton = createPacmanButton("Play Again");
+    restartButton.addActionListener(e -> {
+        resetGame();
+        gameOverDialog.dispose();
+    });
+    
+    // High scores button
+    JButton highScoresButton = createPacmanButton("View High Scores");
+    highScoresButton.addActionListener(e -> {
+        loginSystem.showHighScores(gameOverDialog);
+    });
+    
+    buttonPanel.add(restartButton);
+    buttonPanel.add(highScoresButton);
+    
+    // Add panels to dialog
+    gameOverDialog.add(mainPanel, BorderLayout.CENTER);
+    gameOverDialog.add(buttonPanel, BorderLayout.SOUTH);
+    
+    // Show dialog
+    gameOverDialog.setVisible(true);
+}
+
+public void gameWon() {
+    if (score >= 1860) {
+        // Get high score from login system
+        int highScore = loginSystem.getCurrentHighScore();
+        
+        // Create custom dialog
+        JDialog winDialog = new JDialog();
+        winDialog.setTitle("Congratulations!");
+        winDialog.setSize(450, 300);
+        winDialog.setLayout(new BorderLayout(10, 10));
+        winDialog.setLocationRelativeTo(this);
+        winDialog.setModal(true);
+        
+        // Main panel with win message
+        JPanel mainPanel = new JPanel(new GridLayout(4, 1, 10, 10));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        mainPanel.setBackground(Color.BLACK);
+        
+        // Win label
+        JLabel winLabel = new JLabel("YOU WIN!", SwingConstants.CENTER);
+        winLabel.setFont(new Font("Arial", Font.BOLD, 32));
+        winLabel.setForeground(Color.GREEN);
+        
+        // Message label
+        JLabel messageLabel = new JLabel("You reached 1860 points!", SwingConstants.CENTER);
+        messageLabel.setFont(new Font("Arial", Font.PLAIN, 18));
+        messageLabel.setForeground(Color.WHITE);
+        
+        // Score labels
+        JLabel scoreLabel = new JLabel("Final Score: " + score, SwingConstants.CENTER);
+        JLabel highScoreLabel = new JLabel("High Score: " + highScore, SwingConstants.CENTER);
+        
+        Font scoreFont = new Font("Arial", Font.BOLD, 20);
+        scoreLabel.setFont(scoreFont);
+        scoreLabel.setForeground(Color.YELLOW);
+        highScoreLabel.setFont(scoreFont);
+        highScoreLabel.setForeground(Color.YELLOW);
+        
+        // Add components to main panel
+        mainPanel.add(winLabel);
+        mainPanel.add(messageLabel);
+        mainPanel.add(scoreLabel);
+        mainPanel.add(highScoreLabel);
+        
+        // Button panel
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
+        buttonPanel.setBackground(Color.BLACK);
+        
+        // Restart button
+        JButton restartButton = createPacmanButton("Play Again");
+        restartButton.addActionListener(e -> {
+            resetGame();
+            winDialog.dispose();
+        });
+        
+        // High scores button
+        JButton highScoresButton = createPacmanButton("View High Scores");
+        highScoresButton.addActionListener(e -> {
+            loginSystem.showHighScores(winDialog);
+        });
+        
+        buttonPanel.add(restartButton);
+        buttonPanel.add(highScoresButton);
+        
+        // Add panels to dialog
+        winDialog.add(mainPanel, BorderLayout.CENTER);
+        winDialog.add(buttonPanel, BorderLayout.SOUTH);
+        
+        // Show dialog
+         gameOver = true;
+         loginSystem.saveScore(score);
+        winDialog.setVisible(true);
+        
+       
+        
+    }
+}
+
+// Helper method to create consistent buttons
+private JButton createPacmanButton(String text) {
+    JButton button = new JButton(text);
+    button.setFont(new Font("Arial", Font.BOLD, 16));
+    button.setBackground(Color.YELLOW);
+    button.setForeground(Color.BLACK);
+    button.setFocusPainted(false);
+    button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(Color.WHITE, 2),
+            BorderFactory.createEmptyBorder(8, 20, 8, 20)
+    ));
+    
+    button.addMouseListener(new MouseAdapter() {
+        public void mouseEntered(MouseEvent e) {
+            button.setBackground(Color.ORANGE);
+            button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        }
+        public void mouseExited(MouseEvent e) {
+            button.setBackground(Color.YELLOW);
+        }
+    });
+    
+    return button;
 }
     @Override
     public void keyTyped(KeyEvent e) {}
@@ -608,7 +783,7 @@ if (collision(Pacman, blueGhost) || collision(Pacman, redGhost) ||
 
         if (life == 0) {
             gameOver = true;
-            
+            showGameOverDialog();
             sound.playGameOver();
              resetPositions(); // Ensure positions are reset immediately
     repaint(); 

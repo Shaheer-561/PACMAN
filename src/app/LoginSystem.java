@@ -312,6 +312,10 @@
             e.printStackTrace();
         }
     }
+        public int getCurrentHighScore() {
+    if (currentUser == null) return 0;
+    return currentHighScore;
+}
     public void saveScore(int score) {
         if (currentUser == null) {
             System.err.println("No user is currently logged in. Score not saved.");

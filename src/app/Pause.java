@@ -115,6 +115,7 @@
             setVisible(false);
             animationTimer.stop();
             map.resetGame();
+             map.requestFocusInWindow();
         }
 
         @Override
